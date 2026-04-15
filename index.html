@@ -5,79 +5,70 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ICU カルテ記載支援</title>
 <style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Yu Gothic UI','Meiryo',sans-serif; background:#f0f2f5; color:#1a1a2e; }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Yu Gothic UI','Meiryo',sans-serif;background:#f0f2f5;color:#1a1a2e}
 
-  .header { background:#1b4965; color:#fff; padding:12px 20px; display:flex; align-items:center; gap:10px; }
-  .header h1 { font-size:16px; }
-  .header small { font-size:10px; opacity:.7; }
+  .header{background:#1b4965;color:#fff;padding:12px 20px;display:flex;align-items:center;gap:10px}
+  .header h1{font-size:16px}
+  .header small{font-size:10px;opacity:.7}
 
-  .tabs { display:flex; background:#fff; border-bottom:2px solid #ddd; }
-  .tabs button { flex:1; padding:10px; border:none; background:none; font-family:inherit; font-size:13px; font-weight:bold; color:#888; cursor:pointer; border-bottom:3px solid transparent; }
-  .tabs button:hover { background:#eef3f8; }
-  .tabs button.active { color:#1b4965; border-bottom-color:#1b4965; background:#eef3f8; }
+  .tabs{display:flex;background:#fff;border-bottom:2px solid #ddd}
+  .tabs button{flex:1;padding:10px;border:none;background:none;font-family:inherit;font-size:13px;font-weight:bold;color:#888;cursor:pointer;border-bottom:3px solid transparent}
+  .tabs button:hover{background:#eef3f8}
+  .tabs button.active{color:#1b4965;border-bottom-color:#1b4965;background:#eef3f8}
 
-  .content { max-width:860px; margin:0 auto; padding:16px; }
-  .panel { display:none; }
-  .panel.active { display:block; }
+  .content{max-width:860px;margin:0 auto;padding:16px}
+  .panel{display:none}
+  .panel.active{display:block}
 
-  .card { background:#fff; border-radius:6px; padding:14px; margin-bottom:12px; border:1px solid #e0e0e0; }
-  .card h3 { font-size:13px; color:#1b4965; margin-bottom:6px; }
-  .card .hint { font-size:11px; color:#888; margin-bottom:8px; line-height:1.6; }
+  .card{background:#fff;border-radius:6px;padding:14px;margin-bottom:12px;border:1px solid #e0e0e0}
+  .card h3{font-size:13px;color:#1b4965;margin-bottom:6px}
+  .hint{font-size:11px;color:#888;margin-bottom:8px;line-height:1.6}
 
-  /* ペースト欄 = contenteditable div */
-  .paste-area {
-    width:100%; min-height:200px; padding:10px;
-    font-family:Consolas,'MS Gothic',monospace; font-size:13px; line-height:1.6;
-    border:2px solid #ccc; border-radius:4px; background:#fff; color:#000;
-    overflow-y:auto; max-height:400px;
-    outline:none;
-  }
-  .paste-area:focus { border-color:#2e86ab; background:#fffff8; }
-  .paste-area:empty::before {
-    content:attr(data-placeholder);
-    color:#aaa; pointer-events:none;
-  }
+  textarea{display:block;width:100%;padding:10px;font-family:Consolas,'MS Gothic',monospace;font-size:13px;line-height:1.6;border:2px solid #ccc;border-radius:4px;background:#fff;color:#000;resize:vertical}
+  textarea:focus{outline:none;border-color:#2e86ab;background:#fffff8}
 
-  textarea {
-    display:block; width:100%; min-height:60px; padding:10px;
-    font-family:Consolas,'MS Gothic',monospace; font-size:13px; line-height:1.6;
-    border:2px solid #ccc; border-radius:4px; background:#fff; color:#000; resize:vertical;
-  }
-  textarea:focus { outline:none; border-color:#2e86ab; background:#fffff8; }
+  input[type="text"],select{padding:6px 8px;font-family:inherit;font-size:13px;border:1px solid #ccc;border-radius:4px}
+  input[type="text"]:focus,select:focus{outline:none;border-color:#2e86ab}
 
-  input[type="text"],select { padding:6px 8px; font-family:inherit; font-size:13px; border:1px solid #ccc; border-radius:4px; }
-  input[type="text"]:focus,select:focus { outline:none; border-color:#2e86ab; }
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+  .row label{font-size:13px;font-weight:bold}
 
-  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:6px; }
-  .row label { font-size:13px; font-weight:bold; }
+  .btn{font-family:inherit;font-size:13px;font-weight:bold;padding:8px 16px;border:none;border-radius:4px;cursor:pointer}
+  .btn-blue{background:#1b4965;color:#fff}
+  .btn-blue:hover{background:#163d55}
+  .btn-green{background:#1a936f;color:#fff;font-size:14px;padding:10px 24px}
+  .btn-green:hover{background:#157a5c}
 
-  .btn { font-family:inherit; font-size:13px; font-weight:bold; padding:8px 16px; border:none; border-radius:4px; cursor:pointer; }
-  .btn-blue { background:#1b4965; color:#fff; }
-  .btn-blue:hover { background:#163d55; }
-  .btn-green { background:#1a936f; color:#fff; font-size:14px; padding:10px 24px; }
-  .btn-green:hover { background:#157a5c; }
-  .btn-orange { background:#d4760a; color:#fff; }
-  .btn-orange:hover { background:#b56400; }
+  /* ファイル読み込みボタン */
+  .file-area{border:2px dashed #aac;border-radius:8px;padding:20px;text-align:center;margin-bottom:10px;background:#f8f9ff;cursor:pointer;transition:all .2s}
+  .file-area:hover{border-color:#2e86ab;background:#eef5ff}
+  .file-area.loaded{border-color:#1a936f;background:#eafaf0}
+  .file-area input[type="file"]{display:none}
+  .file-area .icon{font-size:28px;margin-bottom:6px}
+  .file-area .label{font-size:13px;font-weight:bold;color:#1b4965}
+  .file-area .sub{font-size:11px;color:#888;margin-top:4px}
 
-  .paste-btns { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
+  .or-divider{text-align:center;color:#aaa;font-size:12px;margin:8px 0;font-weight:bold}
 
-  .result { margin-top:8px; padding:6px 10px; border-radius:4px; font-size:12px; display:none; }
-  .result.ok { background:#e8f5ef; color:#1a936f; display:block; }
-  .result.err { background:#fee; color:#c00; display:block; }
+  .result{margin-top:8px;padding:6px 10px;border-radius:4px;font-size:12px;display:none}
+  .result.ok{background:#e8f5ef;color:#1a936f;display:block}
+  .result.err{background:#fee;color:#c00;display:block}
 
-  .sec-block { border:1px solid #e0e0e0; border-radius:6px; margin-bottom:6px; overflow:hidden; }
-  .sec-title { padding:8px 12px; background:#eef3f8; font-size:13px; font-weight:bold; color:#1b4965; cursor:pointer; display:flex; justify-content:space-between; border-bottom:1px solid #ddd; }
-  .sec-title:hover { background:#dde8f2; }
-  .sec-content { padding:8px; }
+  .sec-block{border:1px solid #e0e0e0;border-radius:6px;margin-bottom:6px;overflow:hidden}
+  .sec-title{padding:8px 12px;background:#eef3f8;font-size:13px;font-weight:bold;color:#1b4965;cursor:pointer;display:flex;justify-content:space-between;border-bottom:1px solid #ddd}
+  .sec-title:hover{background:#dde8f2}
+  .sec-content{padding:8px}
 
-  .preview { background:#fff; border:1px solid #ccc; border-radius:6px; padding:16px; white-space:pre-wrap; word-break:break-all; font-family:Consolas,'MS Gothic',monospace; font-size:13px; line-height:1.8; min-height:400px; }
-  .toolbar { display:flex; justify-content:flex-end; align-items:center; gap:10px; margin-bottom:10px; }
-  .copymsg { font-size:13px; font-weight:bold; color:#1a936f; display:none; }
+  .preview{background:#fff;border:1px solid #ccc;border-radius:6px;padding:16px;white-space:pre-wrap;word-break:break-all;font-family:Consolas,'MS Gothic',monospace;font-size:13px;line-height:1.8;min-height:400px}
+  .toolbar{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-bottom:10px}
+  .copymsg{font-size:13px;font-weight:bold;color:#1a936f;display:none}
 
-  .diag { background:#fffbe6; border:1px solid #e0d890; border-radius:6px; padding:12px; margin-bottom:12px; }
-  .diag h3 { color:#997a00; font-size:13px; }
-  .diag-log { font-family:Consolas,monospace; font-size:11px; background:#fff; border:1px solid #ddd; padding:8px; margin-top:6px; min-height:40px; max-height:150px; overflow-y:auto; white-space:pre-wrap; color:#333; }
+  .steps{background:#e8f0ff;border:1px solid #b0c4de;border-radius:6px;padding:12px;margin-bottom:12px}
+  .steps h3{font-size:13px;color:#1b4965;margin-bottom:6px}
+  .steps ol{font-size:12px;line-height:1.8;padding-left:20px;color:#333}
+  .steps ol li{margin-bottom:2px}
+  .steps code{background:#d0dff0;padding:1px 4px;border-radius:3px;font-family:Consolas,monospace;font-size:12px}
 </style>
 </head>
 <body>
@@ -101,6 +92,18 @@
   <!-- ===== 入力タブ ===== -->
   <div id="panel-input" class="panel active">
 
+    <!-- 使い方 -->
+    <div class="steps">
+      <h3>📖 使い方（病院PCでの手順）</h3>
+      <ol>
+        <li>電子カルテで検査結果をコピー → <strong>メモ帳</strong>に貼り付け → <code>血液検査.txt</code> として保存</li>
+        <li>Excelで血液ガス表をコピー → <strong>メモ帳</strong>に貼り付け → <code>BGA.txt</code> として保存</li>
+        <li>下の「ファイルを選択」で保存した .txt ファイルを読み込む</li>
+        <li>「解析して配置」ボタンを押す → プレビュータブで確認 → カルテをコピー</li>
+      </ol>
+    </div>
+
+    <!-- 日付 -->
     <div class="card">
       <h3>📅 日付・勤務帯</h3>
       <div class="row">
@@ -124,16 +127,20 @@
     <!-- 血液検査 -->
     <div class="card">
       <h3>🩸 血液検査結果</h3>
-      <div class="hint">
-        電子カルテで検査結果をコピー → 下の枠内をクリック → Ctrl+V で貼り付け<br>
-        ※ 貼り付け後に表や書式が見えても正常です。テキストとして自動変換されます。
+
+      <div class="file-area" id="bloodFileArea" onclick="document.getElementById('bloodFile').click()">
+        <input type="file" id="bloodFile" accept=".txt,.csv,.text" onchange="loadFile(this,'bloodTA','bloodFileArea')">
+        <div class="icon">📂</div>
+        <div class="label">ファイルを選択して読み込み</div>
+        <div class="sub">メモ帳で保存した .txt ファイルを選択</div>
       </div>
-      <div class="paste-area" id="bloodInput" contenteditable="true"
-           data-placeholder="ここをクリックして Ctrl+V で貼り付け"></div>
-      <div class="paste-btns">
-        <button class="btn btn-orange" onclick="clipRead('bloodInput')">📎 クリップボードから読み取り</button>
+
+      <div class="or-divider">── または直接入力 ──</div>
+
+      <textarea id="bloodTA" rows="10" placeholder="ここに直接入力・編集も可能です&#10;&#10;例：&#10;Na 147H 147H&#10;K 3.7 4.2&#10;Cl 108 104"></textarea>
+
+      <div style="margin-top:8px">
         <button class="btn btn-blue" onclick="doParseBlood()">✅ 解析して配置</button>
-        <button class="btn" style="background:#888;color:#fff" onclick="clearArea('bloodInput')">🗑 クリア</button>
       </div>
       <div class="result" id="bloodResult"></div>
     </div>
@@ -141,32 +148,29 @@
     <!-- BGA -->
     <div class="card">
       <h3>💨 血液ガス分析 BGA</h3>
-      <div class="hint">
-        Excelで血液ガス表を範囲選択 → Ctrl+C → 下の枠内をクリック → Ctrl+V<br>
-        ※ 表がそのまま表示されても正常です。
+
+      <div class="file-area" id="bgaFileArea" onclick="document.getElementById('bgaFile').click()">
+        <input type="file" id="bgaFile" accept=".txt,.csv,.text,.tsv" onchange="loadFile(this,'bgaTA','bgaFileArea')">
+        <div class="icon">📂</div>
+        <div class="label">ファイルを選択して読み込み</div>
+        <div class="sub">メモ帳で保存した .txt ファイル、またはExcelから保存した .csv を選択</div>
       </div>
-      <div class="paste-area" id="bgaInput" contenteditable="true"
-           data-placeholder="ここをクリックして Ctrl+V で貼り付け"></div>
-      <div class="paste-btns">
-        <button class="btn btn-orange" onclick="clipRead('bgaInput')">📎 クリップボードから読み取り</button>
+
+      <div class="or-divider">── または直接入力 ──</div>
+
+      <textarea id="bgaTA" rows="10" placeholder="ここに直接入力・編集も可能です&#10;&#10;Excelからメモ帳に貼り付けた内容をファイル保存し、上から読み込んでください"></textarea>
+
+      <div style="margin-top:8px">
         <button class="btn btn-blue" onclick="doParseBGA()">✅ 解析して配置</button>
-        <button class="btn" style="background:#888;color:#fff" onclick="clearArea('bgaInput')">🗑 クリア</button>
       </div>
       <div class="result" id="bgaResult"></div>
-    </div>
-
-    <!-- 診断ログ -->
-    <div class="diag">
-      <h3>🔍 動作診断</h3>
-      <div class="hint">ペーストの状況がここに表示されます。</div>
-      <div class="diag-log" id="diagLog">起動OK</div>
     </div>
 
   </div>
 
   <!-- ===== テンプレートタブ ===== -->
   <div id="panel-template" class="panel">
-    <div class="card"><div class="hint">💡 各セクションのテンプレート文を編集できます。</div></div>
+    <div class="card"><div class="hint">💡 各セクションのテンプレートを編集できます。検査値はプレビューに自動反映されます。</div></div>
     <div id="editors"></div>
   </div>
 
@@ -182,136 +186,20 @@
 </div>
 
 <script>
-/* ======== ログ ======== */
-function log(msg){
-  var el=document.getElementById("diagLog");
-  var d=new Date();
-  var ts=d.getHours()+":"+String(d.getMinutes()).padStart(2,"0")+":"+String(d.getSeconds()).padStart(2,"0");
-  el.textContent+="\n["+ts+"] "+msg;
-  el.scrollTop=el.scrollHeight;
-}
-
-/* ======== contenteditable からテキスト抽出 ======== */
-function getTextFromArea(id){
-  var el=document.getElementById(id);
-  // テーブルがペーストされた場合の特別処理
-  var tables=el.querySelectorAll("table");
-  if(tables.length>0){
-    log(id+": テーブル要素検出("+tables.length+"個) → テーブルからテキスト抽出");
-    var lines=[];
-    for(var t=0;t<tables.length;t++){
-      var rows=tables[t].querySelectorAll("tr");
-      for(var r=0;r<rows.length;r++){
-        var cells=rows[r].querySelectorAll("td,th");
-        var vals=[];
-        for(var c=0;c<cells.length;c++) vals.push(cells[c].textContent.trim());
-        lines.push(vals.join("\t"));
-      }
-    }
-    return lines.join("\n");
-  }
-  // テーブルがなければ textContent を使用
-  // ただし innerText のほうが改行を保持する
-  var text=el.innerText||el.textContent||"";
-  return text;
-}
-
-function clearArea(id){
-  document.getElementById(id).innerHTML="";
-}
-
-/* ======== ペーストイベント ======== */
-function setupPaste(id){
-  var el=document.getElementById(id);
-  el.addEventListener("paste",function(e){
-    var cd=e.clipboardData||window.clipboardData;
-    if(!cd){log(id+": clipboardData なし");return;}
-    var types=[];
-    for(var i=0;i<cd.types.length;i++) types.push(cd.types[i]);
-    log(id+" paste: types=["+types.join(", ")+"]");
-
-    var plain=cd.getData("text/plain");
-    var html=cd.getData("text/html");
-    log("  text/plain: "+(plain?plain.length+"文字":"なし/0文字"));
-    log("  text/html: "+(html?html.length+"文字":"なし/0文字"));
-
-    if(html){
-      // HTMLがある場合、ブラウザのデフォルトペースト（リッチ）を使う
-      // → そのまま contenteditable に HTML が挿入される
-      log("  → HTML ペースト（ブラウザデフォルト）を許可");
-      // デフォルト動作に任せるのでpreventDefaultしない
-      return;
-    }
-
-    if(plain){
-      // プレーンテキストのみの場合
-      e.preventDefault();
-      document.execCommand("insertText",false,plain);
-      log("  → プレーンテキスト挿入");
-      return;
-    }
-
-    // どちらもない場合 → クリップボードに特殊形式のみ
-    log("  → text/plain も text/html もなし。特殊形式のみの可能性");
-  });
-}
-setupPaste("bloodInput");
-setupPaste("bgaInput");
-
-/* ======== Clipboard API (read) - 全形式取得 ======== */
-function clipRead(targetId){
-  var el=document.getElementById(targetId);
-
-  // まず read() で全形式を試す
-  if(navigator.clipboard&&navigator.clipboard.read){
-    navigator.clipboard.read().then(function(items){
-      log("clipboard.read(): "+items.length+" item(s)");
-      for(var i=0;i<items.length;i++){
-        log("  item["+i+"] types: "+items[i].types.join(", "));
-
-        // text/html を優先
-        if(items[i].types.indexOf("text/html")!==-1){
-          items[i].getType("text/html").then(function(blob){
-            return blob.text();
-          }).then(function(html){
-            log("  text/html 取得: "+html.length+"文字");
-            el.innerHTML=html;
-          });
-          return;
-        }
-
-        // text/plain
-        if(items[i].types.indexOf("text/plain")!==-1){
-          items[i].getType("text/plain").then(function(blob){
-            return blob.text();
-          }).then(function(text){
-            log("  text/plain 取得: "+text.length+"文字");
-            el.textContent=text;
-          });
-          return;
-        }
-      }
-      log("  対応形式なし");
-    }).catch(function(err){
-      log("clipboard.read() 失敗: "+err.message);
-      // フォールバック: readText()
-      fallbackReadText(targetId);
-    });
-  } else {
-    fallbackReadText(targetId);
-  }
-}
-
-function fallbackReadText(targetId){
-  if(navigator.clipboard&&navigator.clipboard.readText){
-    navigator.clipboard.readText().then(function(text){
-      log("readText(): "+text.length+"文字");
-      if(text.length>0) document.getElementById(targetId).textContent=text;
-      else log("  テキストが空。電子カルテがHTMLのみでコピーしている可能性");
-    }).catch(function(err){
-      log("readText() 失敗: "+err.message);
-    });
-  }
+/* ======== ファイル読み込み ======== */
+function loadFile(input, targetId, areaId) {
+  var file = input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var text = e.target.result;
+    document.getElementById(targetId).value = text;
+    var area = document.getElementById(areaId);
+    area.classList.add("loaded");
+    area.querySelector(".label").textContent = "✅ " + file.name + " を読み込みました";
+    area.querySelector(".sub").textContent = text.split("\n").length + " 行 / " + text.length + " 文字";
+  };
+  reader.readAsText(file, "UTF-8");
 }
 
 /* ======== データ定義 ======== */
@@ -325,7 +213,7 @@ var SECTIONS=[
 ];
 var T={};
 T.problem="# ARDS\n# ERCP 後膵炎\n# 肺炎\n\n# 膵頭部癌\n# 関節リウマチ\n# 間質性肺炎\n# 高血圧";
-T.conference=""; T.event="";
+T.conference="";T.event="";
 T.consciousness="プレセデックス  mcg/kg/h\nプロポフォール  mg/h（夜間は mg/h）\nレミフェンタニル  γ\nRASS \nCPOT ";
 T.respiratory="経口挿管\n呼吸器：PCV/PC /PEEP /FiO2 /f /Tv   mL前後\n喀痰：\nCXR：\nエコー：\n胸腔ドレーン：  mL";
 T.circulation="HR   -\nABP   /\nビソノテープ  mg\nオノアクト  γ\nlactate ";
@@ -360,9 +248,8 @@ updateShift();
 
 /* ======== 血液検査パース ======== */
 function doParseBlood(){
-  var text=getTextFromArea("bloodInput");
-  log("血液検査テキスト取得: "+text.length+"文字");
-  if(!text||!text.trim()){alert("血液検査結果を先に貼り付けてください。");return;}
+  var text=document.getElementById("bloodTA").value;
+  if(!text||!text.trim()){alert("血液検査結果をファイル読み込み、または直接入力してください。");return;}
 
   parsedBlood={};
   var lines=text.split("\n");
@@ -375,15 +262,13 @@ function doParseBlood(){
   var keys=Object.keys(parsedBlood);
   var el=document.getElementById("bloodResult");
   if(keys.length>0){el.className="result ok";el.textContent="✅ "+keys.length+" 項目検出："+keys.join(", ");}
-  else{el.className="result err";el.textContent="⚠️ 項目を検出できませんでした。テキスト内容:\n"+text.substring(0,200);}
-  log("血液検査解析: "+keys.length+"項目");
+  else{el.className="result err";el.textContent="⚠️ 項目を検出できませんでした。形式を確認してください。\n先頭3行: "+lines.slice(0,3).join(" | ");}
 }
 
 /* ======== BGAパース ======== */
 function doParseBGA(){
-  var text=getTextFromArea("bgaInput");
-  log("BGAテキスト取得: "+text.length+"文字");
-  if(!text||!text.trim()){alert("BGA結果を先に貼り付けてください。");return;}
+  var text=document.getElementById("bgaTA").value;
+  if(!text||!text.trim()){alert("BGA結果をファイル読み込み、または直接入力してください。");return;}
 
   var lines=text.split("\n"),clean=[];
   for(var i=0;i<lines.length;i++) if(lines[i].trim()) clean.push(lines[i]);
@@ -423,8 +308,7 @@ function doParseBGA(){
   parsedBGA={columns:colHeaders,data:data};
   var el=document.getElementById("bgaResult");
   if(data.length>0){el.className="result ok";el.textContent="✅ "+data.length+" 項目 × "+colHeaders.length+" 時点";}
-  else{el.className="result err";el.textContent="⚠️ データを検出できませんでした。テキスト内容:\n"+text.substring(0,200);}
-  log("BGA解析: "+data.length+"項目, "+colHeaders.length+"時点");
+  else{el.className="result err";el.textContent="⚠️ データを検出できませんでした。先頭3行: "+clean.slice(0,3).join(" | ");}
 }
 
 /* ======== テンプレート ======== */
@@ -497,16 +381,19 @@ function renderPreview(){document.getElementById("previewBox").textContent=makeK
 function doCopy(){
   var text=makeKarte();
   if(navigator.clipboard&&navigator.clipboard.writeText){
-    navigator.clipboard.writeText(text).then(function(){flashMsg("✅ コピーしました");});
-  }else{
-    var ta=document.createElement("textarea");ta.value=text;ta.style.position="fixed";ta.style.left="-9999px";
-    document.body.appendChild(ta);ta.select();document.execCommand("copy");document.body.removeChild(ta);
-    flashMsg("✅ コピーしました");
-  }
+    navigator.clipboard.writeText(text).then(function(){flashMsg("✅ コピーしました");}).catch(function(){
+      fallbackCopy(text);
+    });
+  }else{fallbackCopy(text);}
+}
+function fallbackCopy(text){
+  var ta=document.createElement("textarea");ta.value=text;ta.style.position="fixed";ta.style.left="-9999px";
+  document.body.appendChild(ta);ta.select();
+  try{document.execCommand("copy");flashMsg("✅ コピーしました");}
+  catch(e){flashMsg("❌ コピー失敗 - テキストを手動で選択してください");}
+  document.body.removeChild(ta);
 }
 function flashMsg(msg){var el=document.getElementById("copyMsg");el.textContent=msg;el.style.display="inline";setTimeout(function(){el.style.display="none";},2000);}
-
-log("ページ読み込み完了");
 </script>
 </body>
 </html>
