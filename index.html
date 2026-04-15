@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ICU カルテ記載支援</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Yu Gothic UI','Meiryo',sans-serif; background:#f0f2f5; color:#1a1a2e; }
+
+  .header { background:#1b4965; color:#fff; padding:12px 20px; display:flex; align-items:center; gap:10px; }
+  .header h1 { font-size:16px; }
+  .header small { font-size:10px; opacity:.7; }
+
+  .tabs { display:flex; background:#fff; border-bottom:2px solid #ddd; }
+  .tabs button { flex:1; padding:10px; border:none; background:none; font-family:inherit; font-size:13px; font-weight:bold; color:#888; cursor:pointer; border-bottom:3px solid transparent; }
+  .tabs button:hover { background:#eef3f8; }
+  .tabs button.active { color:#1b4965; border-bottom-color:#1b4965; background:#eef3f8; }
+
+  .content { max-width:860px; margin:0 auto; padding:16px; }
+  .panel { display:none; }
+  .panel.active { display:block; }
+
+  .card { background:#fff; border-radius:6px; padding:14px; margin-bottom:12px; border:1px solid #e0e0e0; }
+  .card h3 { font-size:13px; color:#1b4965; margin-bottom:6px; }
+  .card .hint { font-size:11px; color:#888; margin-bottom:8px; line-height:1.6; }
+
+  textarea {
+    display:block; width:100%; min-height:200px; padding:10px;
+    font-family:Consolas,'MS Gothic',monospace; font-size:13px; line-height:1.6;
+    border:2px solid #ccc; border-radius:4px; background:#fff; color:#000; resize:vertical;
+  }
+  textarea:focus { outline:none; border-color:#2e86ab; background:#fffff8; }
+
+  input[type="text"],select { padding:6px 8px; font-family:inherit; font-size:13px; border:1px solid #ccc; border-radius:4px; }
+  input[type="text"]:focus,select:focus { outline:none; border-color:#2e86ab; }
+
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:6px; }
+  .row label { font-size:13px; font-weight:bold; }
+
+  .btn { font-family:inherit; font-size:13px; font-weight:bold; padding:8px 16px; border:none; border-radius:4px; cursor:pointer; }
+  .btn-blue { background:#1b4965; color:#fff; }
+  .btn-blue:hover { background:#163d55; }
+  .btn-green { background:#1a936f; color:#fff; font-size:14px; padding:10px 24px; }
+  .btn-green:hover { background:#157a5c; }
+  .btn-orange { background:#d4760a; color:#fff; }
+  .btn-orange:hover { background:#b56400; }
+
+  .paste-btns { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
+
+  .result { margin-top:8px; padding:6px 10px; border-radius:4px; font-size:12px; display:none; }
+  .result.ok { background:#e8f5ef; color:#1a936f; }
+  .result.err { background:#fee; color:#c00; }
+
+  .sec-block { border:1px solid #e0e0e0; border-radius:6px; margin-bottom:6px; overflow:hidden; }
+  .sec-title { padding:8px 12px; background:#eef3f8; font-size:13px; font-weight:bold; color:#1b4965; cursor:pointer; display:flex; justify-content:space-between; border-bottom:1px solid #ddd; }
+  .sec-title:hover { background:#dde8f2; }
+  .sec-content { padding:8px; }
+  .sec-content textarea { min-height:60px; }
+
+  .preview { background:#fff; border:1px solid #ccc; border-radius:6px; padding:16px; white-space:pre-wrap; word-break:break-all; font-family:Consolas,'MS Gothic',monospace; font-size:13px; line-height:1.8; min-height:400px; }
+  .toolbar { display:flex; justify-content:flex-end; align-items:center; gap:10px; margin-bottom:10px; }
+  .copymsg { font-size:13px; font-weight:bold; color:#1a936f; display:none; }
+
+  .diag { background:#fffbe6; border:1px solid #e0d890; border-radius:6px; padding:12px; margin-bottom:12px; }
+  .diag h3 { color:#997a00; }
+  .diag-log { font-family:Consolas,monospace; font-size:11px; background:#fff; border:1px solid #ddd; padding:8px; margin-top:6px; min-height:40px; max-height:120px; overflow-y:auto; white-space:pre-wrap; color:#333; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span style="font-size:20px">🏥</span>
+  <div>
+    <h1>ICU カルテ記載支援</h1>
+    <small>検査結果の自動配置・テンプレート管理</small>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="active" onclick="showTab('input',this)">📋 検査結果入力</button>
+  <button onclick="showTab('template',this)">✏️ テンプレート編集</button>
+  <button onclick="showTab('preview',this)">👁️ プレビュー</button>
+</div>
+
+<div class="content">
+
+  <!-- ===== 入力タブ ===== -->
+  <div id="panel-input" class="panel active">
+
+    <div class="card">
+      <h3>📅 日付・勤務帯</h3>
+      <div class="row">
+        <label>日付：</label>
+        <input type="text" id="karteDate" value="4月15日" style="width:110px">
+        <label>勤務帯：</label>
+        <select id="shiftType" onchange="updateShift()">
+          <option value="日勤">日勤</option>
+          <option value="夜勤">夜勤</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>前日：</label>
+        <input type="text" id="date1" value="4/14" style="width:70px">
+        <label>当日：</label>
+        <input type="text" id="date2" value="4/15" style="width:70px">
+      </div>
+      <div id="shiftInfo" style="margin-top:6px;font-size:11px;color:#888"></div>
+    </div>
+
+    <!-- 血液検査 -->
+    <div class="card">
+      <h3>🩸 血液検査結果</h3>
+      <div class="hint">
+        方法1: 欄をクリック → Ctrl+V（ダメなら Ctrl+Shift+V）<br>
+        方法2: 下の「クリップボードから読み取り」ボタンを押す
+      </div>
+      <textarea id="bloodInput" placeholder="ここに貼り付け、または下のボタンで読み取り"></textarea>
+      <div class="paste-btns">
+        <button class="btn btn-orange" onclick="clipboardRead('bloodInput')">📎 クリップボードから読み取り</button>
+        <button class="btn btn-blue" onclick="doParseBlood()">✅ 解析して配置</button>
+      </div>
+      <div class="result" id="bloodResult"></div>
+    </div>
+
+    <!-- BGA -->
+    <div class="card">
+      <h3>💨 血液ガス分析 BGA</h3>
+      <div class="hint">
+        方法1: 欄をクリック → Ctrl+V（ダメなら Ctrl+Shift+V）<br>
+        方法2: 下の「クリップボードから読み取り」ボタンを押す
+      </div>
+      <textarea id="bgaInput" placeholder="ここに貼り付け、または下のボタンで読み取り"></textarea>
+      <div class="paste-btns">
+        <button class="btn btn-orange" onclick="clipboardRead('bgaInput')">📎 クリップボードから読み取り</button>
+        <button class="btn btn-blue" onclick="doParseBGA()">✅ 解析して配置</button>
+      </div>
+      <div class="result" id="bgaResult"></div>
+    </div>
+
+    <!-- 診断ログ -->
+    <div class="diag">
+      <h3>🔍 動作診断</h3>
+      <div class="hint">ペーストがうまくいかない場合、ここに状況が表示されます。</div>
+      <div class="diag-log" id="diagLog">起動OK</div>
+      <div style="margin-top:6px">
+        <button class="btn btn-orange" onclick="testClipboard()" style="font-size:12px;padding:6px 12px">クリップボード接続テスト</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== テンプレートタブ ===== -->
+  <div id="panel-template" class="panel">
+    <div class="card">
+      <div class="hint">💡 各セクションのテンプレート文を編集できます。</div>
+    </div>
+    <div id="editors"></div>
+  </div>
+
+  <!-- ===== プレビュータブ ===== -->
+  <div id="panel-preview" class="panel">
+    <div class="toolbar">
+      <span class="copymsg" id="copyMsg"></span>
+      <button class="btn btn-green" onclick="doCopy()">📋 カルテをコピー</button>
+    </div>
+    <div class="preview" id="previewBox"></div>
+  </div>
+
+</div>
+
+<script>
+/* ====== 診断ログ ====== */
+function log(msg) {
+  var el = document.getElementById("diagLog");
+  var now = new Date();
+  var ts = now.getHours() + ":" + String(now.getMinutes()).padStart(2,"0") + ":" + String(now.getSeconds()).padStart(2,"0");
+  el.textContent += "\n[" + ts + "] " + msg;
+  el.scrollTop = el.scrollHeight;
+}
+
+/* ====== Clipboard API 読み取りボタン ====== */
+function clipboardRead(targetId) {
+  var ta = document.getElementById(targetId);
+  if (navigator.clipboard && navigator.clipboard.readText) {
+    navigator.clipboard.readText().then(function(text) {
+      ta.value = text;
+      log("✅ Clipboard API でテキスト取得成功 (" + text.length + "文字)");
+    }).catch(function(err) {
+      log("❌ Clipboard API 失敗: " + err.message);
+      alert("クリップボードの読み取りが拒否されました。\n\n代替方法:\n1. アドレスバー左の鍵アイコンをクリック\n2.「クリップボード」を「許可」に変更\n3. ページを再読み込み\n\nまたは欄をクリックして Ctrl+Shift+V を試してください。");
+    });
+  } else {
+    log("❌ Clipboard API 非対応");
+    alert("このブラウザではクリップボードAPIが使えません。\n欄をクリックして Ctrl+V または Ctrl+Shift+V で貼り付けてください。");
+  }
+}
+
+/* ====== クリップボード接続テスト ====== */
+function testClipboard() {
+  log("--- クリップボード接続テスト開始 ---");
+  log("プロトコル: " + location.protocol);
+  log("navigator.clipboard: " + (navigator.clipboard ? "あり" : "なし"));
+  log("navigator.clipboard.readText: " + (navigator.clipboard && navigator.clipboard.readText ? "あり" : "なし"));
+  log("document.execCommand: " + (typeof document.execCommand === "function" ? "あり" : "なし"));
+
+  if (navigator.clipboard && navigator.clipboard.readText) {
+    navigator.clipboard.readText().then(function(text) {
+      log("✅ readText成功: " + text.length + "文字");
+      if (text.length > 0) {
+        log("先頭50文字: " + text.substring(0, 50));
+      }
+    }).catch(function(err) {
+      log("❌ readText失敗: " + err.name + " / " + err.message);
+    });
+  }
+
+  // Check permissions
+  if (navigator.permissions) {
+    navigator.permissions.query({name: "clipboard-read"}).then(function(result) {
+      log("clipboard-read permission: " + result.state);
+    }).catch(function(err) {
+      log("permissions query失敗: " + err.message);
+    });
+  } else {
+    log("Permissions API: 非対応");
+  }
+}
+
+/* ====== textarea にペーストイベントリスナー追加 ====== */
+function setupPasteHandler(id) {
+  var ta = document.getElementById(id);
+
+  ta.addEventListener("paste", function(e) {
+    log("paste イベント発火 on " + id);
+    // リッチテキストペーストの場合、プレーンテキストに変換
+    var cd = e.clipboardData || window.clipboardData;
+    if (cd) {
+      var types = [];
+      for (var i = 0; i < cd.types.length; i++) types.push(cd.types[i]);
+      log("  clipboard types: " + types.join(", "));
+
+      var plain = cd.getData("text/plain");
+      var html  = cd.getData("text/html");
+      log("  text/plain: " + (plain ? plain.length + "文字" : "なし"));
+      log("  text/html: " + (html ? html.length + "文字" : "なし"));
+
+      if (plain) {
+        // プレーンテキストがあればそのまま挿入（デフォルト動作に任せる）
+        return;
+      }
+
+      if (html && !plain) {
+        // HTMLのみの場合、テキスト抽出
+        e.preventDefault();
+        var tmp = document.createElement("div");
+        tmp.innerHTML = html;
+        var extracted = tmp.textContent || tmp.innerText || "";
+        log("  HTMLからテキスト抽出: " + extracted.length + "文字");
+
+        // カーソル位置に挿入
+        var start = ta.selectionStart;
+        var end   = ta.selectionEnd;
+        ta.value = ta.value.substring(0, start) + extracted + ta.value.substring(end);
+        ta.selectionStart = ta.selectionEnd = start + extracted.length;
+      }
+    } else {
+      log("  clipboardData: なし");
+    }
+  });
+
+  ta.addEventListener("focus", function() {
+    log(id + " にフォーカス");
+  });
+
+  ta.addEventListener("keydown", function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === "v") {
+      log("Ctrl+V 検出 on " + id);
+    }
+  });
+}
+
+setupPasteHandler("bloodInput");
+setupPasteHandler("bgaInput");
+
+/* ====== データ定義 ====== */
+var SECTIONS = [
+  {id:"problem",title:"Problem/診断"},
+  {id:"conference",title:"カンファレンス"},
+  {id:"event",title:"イベント"},
+  {id:"consciousness",title:"意識"},
+  {id:"respiratory",title:"呼吸"},
+  {id:"circulation",title:"循環"},
+  {id:"balance",title:"バランス"},
+  {id:"renal",title:"腎・電解質"},
+  {id:"gi",title:"消化器・栄養"},
+  {id:"blood",title:"血液・凝固"},
+  {id:"infection",title:"感染・抗菌薬"}
+];
+
+var T = {};
+T.problem="# ARDS\n# ERCP 後膵炎\n# 肺炎\n\n# 膵頭部癌\n# 関節リウマチ\n# 間質性肺炎\n# 高血圧";
+T.conference=""; T.event="";
+T.consciousness="プレセデックス  mcg/kg/h\nプロポフォール  mg/h（夜間は mg/h）\nレミフェンタニル  γ\nRASS \nCPOT ";
+T.respiratory="経口挿管\n呼吸器：PCV/PC /PEEP /FiO2 /f /Tv   mL前後\n喀痰：\nCXR：\nエコー：\n胸腔ドレーン：  mL";
+T.circulation="HR   -\nABP   /\nビソノテープ  mg\nオノアクト  γ\nlactate ";
+T.balance="6-14時   mL\nBW  kg（入院時+ kg）";
+T.renal="UOP 6-14時  mL\n内服：フロセミド  mg/2x ＋ アルダクトン  mg/2x\n静注：フロセミド  mg iv x";
+T.gi="EN：クリミール 250-250-250mL\nNG：  mL\n便：";
+T.blood="ヘパリン  単位/day";
+T.infection="長期間高用量のPSLに対してPCP予防でサムチレール 1500mg/1x\n\n 喀痰：\n\n抗菌薬を投与するならMINOか...";
+
+var parsedBlood={}, parsedBGA=null;
+var RENAL=[{l:"Na",k:["Na"]},{l:"K",k:["K"]},{l:"Cl",k:["Cl"]},{l:"Ca",k:["Ca"]},{l:"iP",k:["iP","IP"]},{l:"Mg",k:["Mg"]},{l:"UN",k:["UN","BUN"]},{l:"Cr",k:["Cr","CRE"]}];
+var BLOOD=[{l:"WBC",k:["WBC"]},{l:"Hb",k:["Hb","HB"]},{l:"PLT",k:["PLT","Plt"]},{l:"PT-INR",k:["PT-INR","PTINR"]},{l:"APTT",k:["APTT"]},{l:"Fib",k:["Fib","FIB"]},{l:"FDP(B)",k:["FDP(B)","FDP"]},{l:"Dダイマー",k:["Dダイマー","Dダイマ-","D-dimer"]},{l:"AT",k:["AT","ATIII"]}];
+var INFECT=[{l:"CRP",k:["CRP"]},{l:"WBC",k:["WBC"]}];
+
+/* ====== タブ ====== */
+function showTab(name,btn) {
+  var ps=document.querySelectorAll(".panel"), ts=document.querySelectorAll(".tabs button");
+  for(var i=0;i<ps.length;i++) ps[i].classList.remove("active");
+  for(var i=0;i<ts.length;i++) ts[i].classList.remove("active");
+  document.getElementById("panel-"+name).classList.add("active");
+  btn.classList.add("active");
+  if(name==="preview") renderPreview();
+  if(name==="template") buildEditors();
+}
+
+/* ====== 勤務帯 ====== */
+function updateShift() {
+  var s=document.getElementById("shiftType").value;
+  var t=(s==="日勤")?"夜勤":"日勤";
+  document.getElementById("shiftInfo").textContent="→ 申し送り先：【"+t+"への申し送り】";
+}
+updateShift();
+
+/* ====== 血液検査パース ====== */
+function doParseBlood() {
+  var text=document.getElementById("bloodInput").value;
+  if(!text||!text.trim()){alert("血液検査結果を先に貼り付けてください。");return;}
+  parsedBlood={};
+  var lines=text.split("\n");
+  for(var i=0;i<lines.length;i++){
+    var c=lines[i].replace(/\t/g," ").replace(/\s+/g," ").trim();
+    if(!c)continue;
+    var m=c.match(/^(.+?)\s+([\d.]+[HLhl]?)\s*([\d.]+[HLhl]?)?$/);
+    if(m) parsedBlood[m[1].trim()]=[m[2],m[3]||""];
+  }
+  var keys=Object.keys(parsedBlood);
+  var el=document.getElementById("bloodResult");
+  el.style.display="block";
+  if(keys.length>0){el.className="result ok";el.textContent="✅ "+keys.length+" 項目検出："+keys.join(", ");}
+  else{el.className="result err";el.textContent="⚠️ 項目を検出できませんでした。";}
+  log("血液検査解析: "+keys.length+"項目");
+}
+
+/* ====== BGAパース ====== */
+function doParseBGA() {
+  var text=document.getElementById("bgaInput").value;
+  if(!text||!text.trim()){alert("BGA結果を先に貼り付けてください。");return;}
+  var lines=text.split("\n"), clean=[];
+  for(var i=0;i<lines.length;i++) if(lines[i].trim()) clean.push(lines[i]);
+
+  var colHeaders=[], dateCols=[], timeRow=null, dataStart=0;
+  for(var i=0;i<Math.min(clean.length,5);i++){
+    var parts=clean[i].split("\t");
+    var hasDates=false, hasTimes=false;
+    for(var j=0;j<parts.length;j++){
+      if(/\d{2}\/\d{2}/.test(parts[j].trim())) hasDates=true;
+      if(/^\d{1,2}:\d{2}$/.test(parts[j].trim())) hasTimes=true;
+    }
+    if(hasDates&&!hasTimes){
+      for(var j=0;j<parts.length;j++) if(/\d{2}\/\d{2}/.test(parts[j].trim())) dateCols.push({date:parts[j].trim(),col:j});
+      dataStart=i+1;
+    } else if(hasTimes){timeRow=parts;dataStart=i+1;}
+    else if(/^(血ガス|血液ガス)/.test(parts[0].trim())&&parts.length<=3) dataStart=i+1;
+  }
+  if(timeRow){
+    var curDate=dateCols.length>0?dateCols[0].date:"", dcIdx=0;
+    for(var j=0;j<timeRow.length;j++){
+      var v=timeRow[j].trim();
+      if(/^\d{1,2}:\d{2}$/.test(v)){
+        while(dcIdx+1<dateCols.length&&j>=dateCols[dcIdx+1].col){dcIdx++;curDate=dateCols[dcIdx].date;}
+        colHeaders.push(curDate+" "+v);
+      }
+    }
+  }
+  var data=[];
+  for(var i=dataStart;i<clean.length;i++){
+    var parts=clean[i].split("\t"), name=parts[0].trim();
+    if(!name||/^(血ガス|血液ガス)$/.test(name)) continue;
+    var vals=[];
+    for(var j=1;j<parts.length;j++) if(parts[j].trim()) vals.push(parts[j].trim());
+    if(vals.length>0) data.push({name:name,values:vals});
+  }
+  parsedBGA={columns:colHeaders,data:data};
+  var el=document.getElementById("bgaResult");
+  el.style.display="block";
+  if(data.length>0){el.className="result ok";el.textContent="✅ "+data.length+" 項目 × "+colHeaders.length+" 時点";}
+  else{el.className="result err";el.textContent="⚠️ データを検出できませんでした。";}
+  log("BGA解析: "+data.length+"項目, "+colHeaders.length+"時点");
+}
+
+/* ====== テンプレート編集 ====== */
+var editorsReady=false;
+function buildEditors(){
+  if(editorsReady){syncT();return;}
+  editorsReady=true;
+  var box=document.getElementById("editors");
+  box.innerHTML="";
+  for(var i=0;i<SECTIONS.length;i++){
+    var s=SECTIONS[i];
+    var div=document.createElement("div"); div.className="sec-block";
+    var title=document.createElement("div"); title.className="sec-title";
+    title.innerHTML="<span>【"+s.title+"】</span><span class='arr'>▼</span>";
+    var body=document.createElement("div"); body.className="sec-content";
+    var ta=document.createElement("textarea"); ta.id="t-"+s.id; ta.rows=4; ta.value=T[s.id];
+    (function(id){
+      ta.oninput=function(){T[id]=this.value;};
+      title.onclick=function(){var o=body.style.display!=="none";body.style.display=o?"none":"block";title.querySelector(".arr").textContent=o?"▶":"▼";};
+    })(s.id);
+    body.appendChild(ta); div.appendChild(title); div.appendChild(body); box.appendChild(div);
+  }
+}
+function syncT(){for(var i=0;i<SECTIONS.length;i++){var ta=document.getElementById("t-"+SECTIONS[i].id);if(ta)T[SECTIONS[i].id]=ta.value;}}
+
+/* ====== ヘルパー ====== */
+function norm(s){return s.replace(/[\s\-()（）]/g,"").toLowerCase();}
+function findV(keys){
+  for(var i=0;i<keys.length;i++) if(parsedBlood[keys[i]]) return parsedBlood[keys[i]];
+  var rks=Object.keys(parsedBlood);
+  for(var i=0;i<keys.length;i++){var nk=norm(keys[i]);for(var j=0;j<rks.length;j++) if(norm(rks[j])===nk) return parsedBlood[rks[j]];}
+  return null;
+}
+function padR(s,n){while(s.length<n)s+=" ";return s;}
+function labBlock(items,p){
+  var d1=document.getElementById("date1").value, d2=document.getElementById("date2").value;
+  var lines=[padR("",p)+" "+d1+"    "+d2];
+  for(var i=0;i<items.length;i++){var v=findV(items[i].k);var lbl=padR(items[i].l,p);lines.push(v?lbl+" "+v[0]+(v[1]?"    "+v[1]:""):lbl);}
+  return lines.join("\n");
+}
+function bgaBlock(){
+  if(!parsedBGA||!parsedBGA.data.length) return "";
+  var p=16, hdr=padR("",p);
+  for(var i=0;i<parsedBGA.columns.length;i++){var c=parsedBGA.columns[i];while(c.length<12)c=" "+c;hdr+=c;}
+  var lines=[hdr];
+  for(var i=0;i<parsedBGA.data.length;i++){var row=parsedBGA.data[i];var line=padR(row.name,p);for(var j=0;j<row.values.length;j++){var v=row.values[j];while(v.length<12)v=" "+v;line+=v;}lines.push(line);}
+  return lines.join("\n");
+}
+
+/* ====== カルテ生成 ====== */
+function makeKarte(){
+  syncT();
+  var date=document.getElementById("karteDate").value, shift=document.getElementById("shiftType").value;
+  var target=(shift==="日勤")?"夜勤":"日勤", hasLab=Object.keys(parsedBlood).length>0;
+  var o=[];
+  o.push(date+" "+shift); o.push(""); o.push("【"+target+"への申し送り】"); o.push("──────────────────────"); o.push("");
+  for(var i=0;i<SECTIONS.length;i++){
+    var s=SECTIONS[i]; o.push("【"+s.title+"】");
+    if(s.id==="respiratory"){o.push(T[s.id]);var bg=bgaBlock();if(bg){o.push("");o.push("BGA：");o.push(bg);}}
+    else if(s.id==="renal"){o.push(T[s.id]);if(hasLab){o.push("");o.push(labBlock(RENAL,6));}}
+    else if(s.id==="blood"){o.push(T[s.id]);if(hasLab){o.push("");o.push(labBlock(BLOOD,10));}}
+    else if(s.id==="infection"){var ps=T[s.id].split("\n");o.push(ps[0]||"");if(hasLab){o.push("");o.push(labBlock(INFECT,6));}if(ps.length>1){o.push("");o.push(ps.slice(1).join("\n"));}}
+    else o.push(T[s.id]);
+    o.push("");
+  }
+  return o.join("\n");
+}
+
+/* ====== プレビュー・コピー ====== */
+function renderPreview(){document.getElementById("previewBox").textContent=makeKarte();}
+function doCopy(){
+  var text=makeKarte();
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(function(){flashMsg("✅ コピーしました");});
+  } else {
+    var ta=document.createElement("textarea");ta.value=text;ta.style.position="fixed";ta.style.left="-9999px";
+    document.body.appendChild(ta);ta.select();document.execCommand("copy");document.body.removeChild(ta);
+    flashMsg("✅ コピーしました");
+  }
+}
+function flashMsg(msg){var el=document.getElementById("copyMsg");el.textContent=msg;el.style.display="inline";setTimeout(function(){el.style.display="none";},2000);}
+
+log("ページ読み込み完了");
+log("URL: " + location.href);
+log("プロトコル: " + location.protocol);
+</script>
+</body>
+</html>
