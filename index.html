@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ICU カルテ記載支援</title>
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+1:wght@400;600;700&family=M+PLUS+1+Code&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f3f5f7;
+    --card: #ffffff;
+    --primary: #1b4965;
+    --primary-light: #e3edf5;
+    --accent: #2e86ab;
+    --success: #1a936f;
+    --success-bg: #e8f5ef;
+    --text: #1a1a2e;
+    --text-sub: #6b7b8d;
+    --border: #d4dbe3;
+    --mono: 'M PLUS 1 Code', 'Courier New', monospace;
+    --sans: 'M PLUS 1', 'Hiragino Sans', sans-serif;
+    --radius: 8px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, var(--primary) 0%, #2a6f97 100%);
+    color: #fff;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 10px rgba(27,73,101,0.25);
+  }
+  .header-icon { font-size: 22px; }
+  .header-title { font-size: 16px; font-weight: 700; letter-spacing: 0.5px; }
+  .header-sub { font-size: 10px; opacity: 0.75; margin-top: 1px; }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 52px;
+    z-index: 99;
+  }
+  .tab {
+    flex: 1;
+    padding: 11px 8px;
+    border: none;
+    background: none;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-sub);
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s;
+    text-align: center;
+  }
+  .tab:hover { background: var(--primary-light); }
+  .tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    background: var(--primary-light);
+  }
+
+  /* Content */
+  .content { padding: 14px; max-width: 800px; margin: 0 auto; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* Cards */
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 14px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    border: 1px solid rgba(0,0,0,0.04);
+  }
+  .card-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .card-hint {
+    font-size: 11px;
+    color: var(--text-sub);
+    margin-bottom: 8px;
+    line-height: 1.5;
+  }
+
+  /* Form elements */
+  textarea, input[type="text"], select {
+    font-family: var(--mono);
+    font-size: 13px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    width: 100%;
+    transition: border-color 0.2s;
+    color: var(--text);
+    background: #fafbfc;
+  }
+  textarea:focus, input[type="text"]:focus, select:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: #fff;
+  }
+  textarea { resize: vertical; line-height: 1.6; }
+
+  select {
+    font-family: var(--sans);
+    cursor: pointer;
+    appearance: auto;
+  }
+
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .row label { font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .row input[type="text"] { width: 80px; }
+  .row select { width: auto; min-width: 90px; }
+
+  /* Buttons */
+  .btn {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 8px 18px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .btn-primary {
+    background: var(--primary);
+    color: #fff;
+  }
+  .btn-primary:hover { background: #163d55; }
+  .btn-success {
+    background: var(--success);
+    color: #fff;
+    font-size: 14px;
+    padding: 10px 24px;
+    box-shadow: 0 2px 8px rgba(26,147,111,0.25);
+  }
+  .btn-success:hover { background: #157a5c; }
+
+  .badge {
+    font-size: 12px;
+    color: var(--success);
+    background: var(--success-bg);
+    padding: 6px 10px;
+    border-radius: 6px;
+    margin-top: 8px;
+  }
+
+  /* Section editors */
+  .sec-editor {
+    border: 1px solid rgba(0,0,0,0.04);
+    border-radius: var(--radius);
+    margin-bottom: 8px;
+    overflow: hidden;
+  }
+  .sec-header {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--primary);
+    padding: 8px 12px;
+    background: var(--primary-light);
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .sec-header:hover { background: #d5e5f2; }
+  .sec-body { padding: 10px; }
+  .sec-body textarea { min-height: 60px; }
+
+  /* Preview */
+  .preview-box {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 18px;
+    white-space: pre-wrap;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.75;
+    color: var(--text);
+    border: 1px solid var(--border);
+    overflow-x: auto;
+    word-break: break-all;
+  }
+  .preview-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .copy-msg {
+    font-size: 13px;
+    font-weight: 600;
+    animation: fadeIn 0.2s;
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="header-icon">🏥</span>
+  <div>
+    <div class="header-title">ICU カルテ記載支援</div>
+    <div class="header-sub">検査結果の自動配置・テンプレート管理</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('input')">📋 入力</button>
+  <button class="tab" onclick="switchTab('template')">✏️ テンプレート</button>
+  <button class="tab" onclick="switchTab('preview')">👁️ プレビュー</button>
+</div>
+
+<div class="content">
+
+  <!-- ===== INPUT PANEL ===== -->
+  <div id="panel-input" class="panel active">
+
+    <div class="card">
+      <div class="card-label">📅 日付・勤務帯</div>
+      <div class="row" style="margin-bottom:8px;">
+        <label>日付：</label>
+        <input type="text" id="karteDate" value="4月15日" style="width:100px;">
+        <label>勤務帯：</label>
+        <select id="shiftType" onchange="updateShiftDisplay()">
+          <option value="日勤">日勤</option>
+          <option value="夜勤">夜勤</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>前日日付：</label>
+        <input type="text" id="date1" value="4/14" style="width:80px;">
+        <label>当日日付：</label>
+        <input type="text" id="date2" value="4/15" style="width:80px;">
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:var(--text-sub);" id="shiftInfo">
+        → 申し送り先：【夜勤への申し送り】
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">🩸 血液検査結果</div>
+      <div class="card-hint">カルテからコピーした検査結果をそのまま貼り付けてください</div>
+      <textarea id="bloodInput" rows="12" placeholder="Na 147H 147H
+K 3.7 4.2
+Cl 108 104
+Ca 8.3L 8.8
+iP 2.8 4.0
+Mg 1.9 2.1
+UN 23.7H 21.6H
+Cr 0.26L 0.32L
+WBC 9.6H 8.9H
+Hb 9.5 9.5
+PLT 159.0 176.0
+PT-INR 1.02 0.96
+APTT 42H 37H
+Fib 272 357
+FDP(B) 5.7H 4.7
+Dダイマー 3.4H 2.4H
+AT 59L 66L
+CRP 2.83H 9.20H"></textarea>
+      <div style="margin-top:8px;">
+        <button class="btn btn-primary" onclick="parseBlood()">解析して配置</button>
+      </div>
+      <div id="bloodResult" class="badge" style="display:none;"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">💨 血液ガス分析（BGA）</div>
+      <div class="card-hint">Excelからコピーした血液ガス結果を貼り付けてください（タブ区切り）</div>
+      <textarea id="bgaInput" rows="12" placeholder="血液ガス	04/14			04/15
+	18:04	05:30	06:14	07:00	08:06	11:00	13:56
+血ガス
+pH	7.293	7.241	7.261	7.320	7.386	7.455	7.432
+pCO2	72.6	93.4	88.8	76.2	63.0	57.1	59.6
+pO2	86.4	67.7	79.4	74.1	65.7	68.1	80.6
+..."></textarea>
+      <div style="margin-top:8px;">
+        <button class="btn btn-primary" onclick="parseBGA()">解析して配置</button>
+      </div>
+      <div id="bgaResult" class="badge" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- ===== TEMPLATE PANEL ===== -->
+  <div id="panel-template" class="panel">
+    <div class="card">
+      <div class="card-hint">💡 各セクションのテンプレート文を編集できます。検査値は入力タブで解析後、自動的にプレビューに反映されます。セクション名をクリックで開閉できます。</div>
+    </div>
+    <div id="sectionEditors"></div>
+  </div>
+
+  <!-- ===== PREVIEW PANEL ===== -->
+  <div id="panel-preview" class="panel">
+    <div class="preview-toolbar">
+      <span id="copyMsg" class="copy-msg" style="display:none;"></span>
+      <button class="btn btn-success" onclick="copyKarte()">📋 カルテをコピー</button>
+    </div>
+    <div id="previewBox" class="preview-box"></div>
+  </div>
+
+</div>
+
+<script>
+// ===== DATA =====
+const SECTIONS = [
+  { id: "problem", title: "Problem/診断" },
+  { id: "conference", title: "カンファレンス" },
+  { id: "event", title: "イベント" },
+  { id: "consciousness", title: "意識" },
+  { id: "respiratory", title: "呼吸" },
+  { id: "circulation", title: "循環" },
+  { id: "balance", title: "バランス" },
+  { id: "renal", title: "腎・電解質" },
+  { id: "gi", title: "消化器・栄養" },
+  { id: "blood", title: "血液・凝固" },
+  { id: "infection", title: "感染・抗菌薬" },
+];
+
+const DEFAULT_TEMPLATES = {
+  problem: `# ARDS\n# ERCP 後膵炎\n# 肺炎\n\n# 膵頭部癌\n# 関節リウマチ\n# 間質性肺炎\n# 高血圧`,
+  conference: "",
+  event: "",
+  consciousness: `プレセデックス  mcg/kg/h\nプロポフォール  mg/h（夜間は mg/h）\nレミフェンタニル  γ\nRASS \nCPOT `,
+  respiratory: `経口挿管\n呼吸器：PCV/PC /PEEP /FiO2 /f /Tv   mL前後\n喀痰：\nCXR：\nエコー：\n胸腔ドレーン：  mL`,
+  circulation: `HR   -\nABP   /\nビソノテープ  mg\nオノアクト  γ\nlactate `,
+  balance: `6-14時   mL\nBW  kg（入院時+ kg）`,
+  renal: `UOP 6-14時  mL\n内服：フロセミド  mg/2x ＋ アルダクトン  mg/2x\n静注：フロセミド  mg iv x`,
+  gi: `EN：クリミール 250-250-250mL\nNG：  mL\n便：`,
+  blood: `ヘパリン  単位/day`,
+  infection: `長期間高用量のPSLに対してPCP予防でサムチレール 1500mg/1x\n\n 喀痰：\n\n抗菌薬を投与するならMINOか...`,
+};
+
+const RENAL_KEYS = [
+  { label: "Na", keys: ["Na"] },
+  { label: "K", keys: ["K"] },
+  { label: "Cl", keys: ["Cl"] },
+  { label: "Ca", keys: ["Ca"] },
+  { label: "iP", keys: ["iP", "IP", "ip"] },
+  { label: "Mg", keys: ["Mg"] },
+  { label: "UN", keys: ["UN", "BUN"] },
+  { label: "Cr", keys: ["Cr", "CRE"] },
+];
+
+const BLOOD_KEYS = [
+  { label: "WBC", keys: ["WBC"] },
+  { label: "Hb", keys: ["Hb", "HB"] },
+  { label: "PLT", keys: ["PLT", "Plt"] },
+  { label: "PT-INR", keys: ["PT-INR", "PTINR", "PT-INR"] },
+  { label: "APTT", keys: ["APTT"] },
+  { label: "Fib", keys: ["Fib", "FIB", "Fbg"] },
+  { label: "FDP(B)", keys: ["FDP(B)", "FDP"] },
+  { label: "Dダイマー", keys: ["Dダイマー", "Dダイマ-", "D-dimer", "DDimer", "Dダイマ"] },
+  { label: "AT", keys: ["AT", "ATIII", "AT-III"] },
+];
+
+const INFECTION_KEYS = [
+  { label: "CRP", keys: ["CRP"] },
+  { label: "WBC", keys: ["WBC"] },
+];
+
+const BGA_ITEMS = [
+  "pH","pCO2","pO2","ctHb","Hct","sO2","COHb","O2Hb",
+  "MetHb","HHb","K+","Na+","Cl-","Ca++","Ca++ (7.4)",
+  "Glucose","Lactate","ABE","SBE","cHCO3act","cAnGap","Anion Gap"
+];
+
+let templates = { ...DEFAULT_TEMPLATES };
+let parsedBloodData = {};
+let parsedBGAData = null;
+let sectionOpen = {};
+SECTIONS.forEach(s => sectionOpen[s.id] = true);
+
+// ===== TAB SWITCHING =====
+function switchTab(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  document.querySelectorAll('.tab').forEach(t => {
+    if (t.textContent.includes(name === 'input' ? '入力' : name === 'template' ? 'テンプレート' : 'プレビュー')) {
+      t.classList.add('active');
+    }
+  });
+  if (name === 'preview') renderPreview();
+  if (name === 'template') buildSectionEditors();
+}
+
+// ===== SHIFT LOGIC =====
+function updateShiftDisplay() {
+  const shift = document.getElementById('shiftType').value;
+  const target = shift === '日勤' ? '夜勤' : '日勤';
+  document.getElementById('shiftInfo').textContent = `→ 申し送り先：【${target}への申し送り】`;
+}
+
+function getShiftHeader() {
+  const date = document.getElementById('karteDate').value;
+  const shift = document.getElementById('shiftType').value;
+  return `${date} ${shift}`;
+}
+
+function getHandoffTitle() {
+  const shift = document.getElementById('shiftType').value;
+  const target = shift === '日勤' ? '夜勤' : '日勤';
+  return `【${target}への申し送り】`;
+}
+
+// ===== BLOOD PARSING =====
+function parseBlood() {
+  const text = document.getElementById('bloodInput').value.trim();
+  if (!text) return;
+  const results = {};
+  for (const line of text.split('\n')) {
+    const cleaned = line.replace(/\s+/g, ' ').trim();
+    const m = cleaned.match(/^([A-Za-zぁ-んァ-ヶー\u4e00-\u9fff()（）\-\/\u3099\u309A\u309B\u309C゛゜ﾞﾟ]+)\s+([\d.]+[HLhl]?)\s*([\d.]+[HLhl]?)?/);
+    if (m) {
+      results[m[1].trim()] = [m[2], m[3] || ''];
+    }
+  }
+  parsedBloodData = results;
+  const count = Object.keys(results).length;
+  const el = document.getElementById('bloodResult');
+  el.style.display = 'block';
+  el.textContent = `✅ ${count} 項目を検出しました`;
+}
+
+function findVal(keys) {
+  for (const k of keys) {
+    if (parsedBloodData[k]) return parsedBloodData[k];
+  }
+  for (const k of keys) {
+    for (const rk of Object.keys(parsedBloodData)) {
+      if (rk.replace(/[\s\-()]/g, '').toLowerCase() === k.replace(/[\s\-()]/g, '').toLowerCase()) {
+        return parsedBloodData[rk];
+      }
+    }
+  }
+  return null;
+}
+
+function fmtRow(label, vals, pad) {
+  if (!vals) return label.padEnd(pad || 10);
+  const v = vals[1] ? `${vals[0]}  ${vals[1]}` : vals[0];
+  return `${label.padEnd(pad || 10)} ${v}`;
+}
+
+function makeLabBlock(items, pad) {
+  const d1 = document.getElementById('date1').value;
+  const d2 = document.getElementById('date2').value;
+  let lines = [`${''.padEnd(pad || 10)} ${d1}    ${d2}`];
+  for (const item of items) {
+    lines.push(fmtRow(item.label, findVal(item.keys), pad));
+  }
+  return lines.join('\n');
+}
+
+// ===== BGA PARSING =====
+function parseBGA() {
+  const text = document.getElementById('bgaInput').value.trim();
+  if (!text) return;
+  const lines = text.split('\n').filter(l => l.trim());
+  const isTSV = lines.some(l => l.includes('\t'));
+  const split = isTSV ? (s => s.split('\t')) : (s => s.split(/\s{2,}/));
+
+  // Detect header rows
+  let columns = [];
+  let dateRow = [];
+  let dataStart = 0;
+
+  for (let i = 0; i < Math.min(lines.length, 5); i++) {
+    const parts = split(lines[i]).map(s => s.trim()).filter(Boolean);
+    const hasDates = parts.some(p => /\d{2}\/\d{2}/.test(p));
+    const hasTimes = parts.some(p => /^\d{1,2}:\d{2}$/.test(p));
+
+    if (hasDates && !hasTimes) {
+      // Date row
+      dateRow = parts;
+      dataStart = i + 1;
+    } else if (hasTimes) {
+      // Time row
+      columns = parts.filter(p => /^\d{1,2}:\d{2}$/.test(p));
+      dataStart = i + 1;
+    } else if (parts.length === 1 && (parts[0] === '血ガス' || parts[0] === '血液ガス')) {
+      dataStart = i + 1;
+    }
+  }
+
+  // Build date+time column headers
+  let colHeaders = [];
+  if (dateRow.length > 0 && columns.length > 0) {
+    // Try to pair dates with times based on position
+    // Simple approach: build from raw first two lines
+    const rawParts1 = split(lines[0]).map(s => s.trim());
+    const rawParts2 = split(lines[1]).map(s => s.trim());
+
+    let dates = [];
+    let datePositions = [];
+    rawParts1.forEach((p, idx) => {
+      if (/\d{2}\/\d{2}/.test(p)) {
+        dates.push(p);
+        datePositions.push(idx);
+      }
+    });
+
+    // Map times to dates
+    let curDate = '';
+    let timeIdx = 0;
+    // Use raw tab-split of line 0 and line 1 for position mapping
+    const raw0 = lines[0].split('\t');
+    const raw1 = lines[1] ? lines[1].split('\t') : [];
+
+    colHeaders = [];
+    let lastDate = '';
+    for (let i = 0; i < raw0.length; i++) {
+      if (/\d{2}\/\d{2}/.test(raw0[i].trim())) lastDate = raw0[i].trim();
+    }
+
+    // Simpler: just pair sequentially
+    // Find all date entries and their column positions
+    let dateCols = [];
+    for (let i = 0; i < raw0.length; i++) {
+      const v = raw0[i].trim();
+      if (/\d{2}\/\d{2}/.test(v)) dateCols.push({ date: v, col: i });
+    }
+
+    let currentDate = dateCols.length > 0 ? dateCols[0].date : '';
+    let dcIdx = 0;
+    for (let i = 0; i < raw1.length; i++) {
+      const v = raw1[i].trim();
+      if (/^\d{1,2}:\d{2}$/.test(v)) {
+        // Advance date if needed
+        if (dcIdx + 1 < dateCols.length && i >= dateCols[dcIdx + 1].col) {
+          dcIdx++;
+          currentDate = dateCols[dcIdx].date;
+        }
+        colHeaders.push(currentDate + ' ' + v);
+      }
+    }
+    if (colHeaders.length === 0) colHeaders = columns;
+  } else {
+    colHeaders = columns;
+  }
+
+  // Parse data rows
+  const data = [];
+  for (let i = dataStart; i < lines.length; i++) {
+    const parts = split(lines[i]).map(s => s.trim()).filter(Boolean);
+    if (parts.length < 2) continue;
+    const name = parts[0];
+    if (name === '血ガス' || name === '血液ガス') continue;
+    const isKnown = BGA_ITEMS.some(b =>
+      name.replace(/\s/g, '').toLowerCase() === b.replace(/\s/g, '').toLowerCase()
+    );
+    if (isKnown || /^[a-zA-Z]/.test(name)) {
+      data.push({ name, values: parts.slice(1) });
+    }
+  }
+
+  parsedBGAData = { columns: colHeaders, data };
+  const el = document.getElementById('bgaResult');
+  el.style.display = 'block';
+  el.textContent = `✅ ${data.length} 項目 × ${colHeaders.length} 時点を検出しました`;
+}
+
+function formatBGABlock() {
+  if (!parsedBGAData || !parsedBGAData.data.length) return '';
+  const { columns, data } = parsedBGAData;
+  let lines = [];
+
+  // Header row
+  const pad = 16;
+  lines.push(' '.repeat(pad) + columns.map(c => c.padStart(10)).join(''));
+
+  for (const row of data) {
+    const nameStr = row.name.padEnd(pad);
+    const valsStr = row.values.map(v => v.padStart(10)).join('');
+    lines.push(nameStr + valsStr);
+  }
+  return lines.join('\n');
+}
+
+// ===== SECTION EDITORS =====
+function buildSectionEditors() {
+  const container = document.getElementById('sectionEditors');
+  // Only rebuild if empty
+  if (container.children.length > 0) {
+    // Just sync values back
+    SECTIONS.forEach(sec => {
+      const ta = document.getElementById('tmpl-' + sec.id);
+      if (ta) templates[sec.id] = ta.value;
+    });
+    return;
+  }
+
+  container.innerHTML = '';
+  SECTIONS.forEach(sec => {
+    const div = document.createElement('div');
+    div.className = 'sec-editor';
+    const isOpen = sectionOpen[sec.id];
+    div.innerHTML = `
+      <div class="sec-header" onclick="toggleSection('${sec.id}')">
+        <span>【${sec.title}】</span>
+        <span id="arrow-${sec.id}">${isOpen ? '▼' : '▶'}</span>
+      </div>
+      <div class="sec-body" id="body-${sec.id}" style="display:${isOpen ? 'block' : 'none'}">
+        <textarea id="tmpl-${sec.id}" rows="4" oninput="templates['${sec.id}']=this.value">${templates[sec.id]}</textarea>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function toggleSection(id) {
+  sectionOpen[id] = !sectionOpen[id];
+  const body = document.getElementById('body-' + id);
+  const arrow = document.getElementById('arrow-' + id);
+  body.style.display = sectionOpen[id] ? 'block' : 'none';
+  arrow.textContent = sectionOpen[id] ? '▼' : '▶';
+}
+
+// ===== SYNC TEMPLATES =====
+function syncTemplates() {
+  SECTIONS.forEach(sec => {
+    const ta = document.getElementById('tmpl-' + sec.id);
+    if (ta) templates[sec.id] = ta.value;
+  });
+}
+
+// ===== PREVIEW =====
+function renderPreview() {
+  syncTemplates();
+  const box = document.getElementById('previewBox');
+  box.textContent = generateKarte();
+}
+
+function generateKarte() {
+  const lines = [];
+  const shiftHeader = getShiftHeader();
+  const handoff = getHandoffTitle();
+
+  lines.push(shiftHeader);
+  lines.push('');
+  lines.push(handoff);
+  lines.push('──────────────────────');
+  lines.push('');
+
+  for (const sec of SECTIONS) {
+    lines.push(`【${sec.title}】`);
+
+    if (sec.id === 'respiratory') {
+      lines.push(templates[sec.id]);
+      const bga = formatBGABlock();
+      if (bga) {
+        lines.push('');
+        lines.push('BGA：');
+        lines.push(bga);
+      }
+    } else if (sec.id === 'renal') {
+      lines.push(templates[sec.id]);
+      if (Object.keys(parsedBloodData).length > 0) {
+        lines.push('');
+        lines.push(makeLabBlock(RENAL_KEYS, 6));
+      }
+    } else if (sec.id === 'blood') {
+      lines.push(templates[sec.id]);
+      if (Object.keys(parsedBloodData).length > 0) {
+        lines.push('');
+        lines.push(makeLabBlock(BLOOD_KEYS, 10));
+      }
+    } else if (sec.id === 'infection') {
+      const tmplLines = templates[sec.id].split('\n');
+      lines.push(tmplLines[0] || '');
+      if (Object.keys(parsedBloodData).length > 0) {
+        lines.push('');
+        lines.push(makeLabBlock(INFECTION_KEYS, 6));
+      }
+      if (tmplLines.length > 1) {
+        lines.push('');
+        lines.push(tmplLines.slice(1).join('\n'));
+      }
+    } else {
+      lines.push(templates[sec.id]);
+    }
+
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}
+
+// ===== COPY =====
+function copyKarte() {
+  syncTemplates();
+  const text = generateKarte();
+  navigator.clipboard.writeText(text).then(() => {
+    showCopyMsg('✅ コピーしました', 'var(--success)');
+  }).catch(() => {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showCopyMsg('✅ コピーしました', 'var(--success)');
+  });
+}
+
+function showCopyMsg(msg, color) {
+  const el = document.getElementById('copyMsg');
+  el.textContent = msg;
+  el.style.color = color;
+  el.style.display = 'inline';
+  setTimeout(() => { el.style.display = 'none'; }, 2000);
+}
+
+// ===== INIT =====
+updateShiftDisplay();
+</script>
+</body>
+</html>
